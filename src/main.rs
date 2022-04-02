@@ -1,7 +1,7 @@
 use clap::Parser;
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::cmp::min;
+use std::cmp::{max, min};
 use std::io;
 use std::io::Write;
 use std::str::FromStr;
@@ -9,6 +9,13 @@ use std::str::FromStr;
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
+    #[clap(
+        help = "Average mode: calculate average steps required to solve",
+        short,
+        long
+    )]
+    average: bool,
+
     #[clap(
         help = "Interactive mode: program makes a guess and user enters feedback",
         short,
@@ -57,6 +64,11 @@ fn generate_all_peg_combinations() -> Vec<CodePegs> {
 fn pick_guess(candidates: &Vec<CodePegs>) -> CodePegs {
     let mut best_guess = candidates[0];
     let mut best_score = candidates.len() as i32;
+
+    // Manually input first guess.
+    // if candidates.len() == 6 * 6 * 6 * 6 {
+    //     return [1, 1, 2, 2];
+    // }
 
     // Try each candidate as the guess.
     for guess in candidates {
@@ -153,12 +165,12 @@ fn apply_feedback(
     combos
 }
 
-fn solve(mode: ExecutionMode) {
+fn solve(mode: ExecutionMode) -> i32 {
     let mut candidates = generate_all_peg_combinations();
-    for _iter in 0..6 {
+    for iter in 0..6 {
         println!(" {} candidates", candidates.len());
         if candidates.len() <= 0 {
-            return;
+            return -1;
         }
 
         let guess = pick_guess(&candidates);
@@ -174,12 +186,15 @@ fn solve(mode: ExecutionMode) {
             actual_feedback.0, actual_feedback.1
         );
 
-        candidates = apply_feedback(candidates, &guess, &actual_feedback);
-        if candidates.len() == 1 {
-            println!("SOLUTION: {}", format_pegs(&candidates[0]));
-            break;
+        if actual_feedback == (NUM_PEGS as i8, 0) {
+            println!("SOLUTION: {} ({} guesses)", format_pegs(&guess), iter + 1);
+            return iter + 1;
         }
+
+        candidates = apply_feedback(candidates, &guess, &actual_feedback);
     }
+
+    return -1;
 }
 
 fn main() {
@@ -187,6 +202,23 @@ fn main() {
     if args.interactive {
         println!("INTERACTIVE MODE");
         solve(ExecutionMode::Interactive);
+    } else if args.average {
+        println!("AVERAGE MODE");
+        let solutions = generate_all_peg_combinations();
+        let num_solutions = solutions.len();
+        let mut sum_steps = 0;
+        let mut max_steps = 0;
+
+        for solution in solutions {
+            let steps = solve(ExecutionMode::KnownSolution(solution));
+            assert!(steps > 0);
+            sum_steps += steps;
+            max_steps = max(max_steps, steps);
+        }
+
+        let avg_steps = (sum_steps as f64) / (num_solutions as f64);
+        println!("avg: {} / {} = {}", sum_steps, num_solutions, avg_steps);
+        println!("max: {}", max_steps);
     } else {
         let solution = generate_puzzle();
         println!("KNOWN SOLUTION: {}", format_pegs(&solution));
