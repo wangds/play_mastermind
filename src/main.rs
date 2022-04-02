@@ -14,6 +14,23 @@ fn generate_puzzle() -> CodePegs {
     [1, 2, 3, 4]
 }
 
+fn generate_all_peg_combinations() -> Vec<CodePegs> {
+    // 6^4 = 1,296 combinations.
+    let mut combos = Vec::new();
+
+    for a in MIN_PEG_VALUE..(MAX_PEG_VALUE + 1) {
+        for b in MIN_PEG_VALUE..(MAX_PEG_VALUE + 1) {
+            for c in MIN_PEG_VALUE..(MAX_PEG_VALUE + 1) {
+                for d in MIN_PEG_VALUE..(MAX_PEG_VALUE + 1) {
+                    combos.push([a, b, c, d]);
+                }
+            }
+        }
+    }
+
+    combos
+}
+
 fn check_pegs(solution: &CodePegs, guess: &CodePegs) -> Feedback {
     let mut num_correct = 0;
     let mut num_correct_values = 0;
@@ -38,16 +55,39 @@ fn check_pegs(solution: &CodePegs, guess: &CodePegs) -> Feedback {
     (num_correct, num_correct_values - num_correct)
 }
 
+fn apply_feedback(
+    candidates: Vec<CodePegs>,
+    guess: &CodePegs,
+    actual_feedback: &Feedback,
+) -> Vec<CodePegs> {
+    let mut combos = Vec::new();
+
+    for candidate in candidates {
+        let expected_feedback = check_pegs(&candidate, &guess);
+        if expected_feedback == *actual_feedback {
+            combos.push(candidate);
+        }
+    }
+
+    combos
+}
+
 fn main() {
     let solution = generate_puzzle();
     println!("solution: {}", format_pegs(&solution));
 
+    let candidates = generate_all_peg_combinations();
+    println!("{} candidates", candidates.len());
+
     let guess = [1, 1, 4, 5];
     println!("guess   : {}", format_pegs(&guess));
 
-    let (num_correct, num_incorrect_position) = check_pegs(&solution, &guess);
+    let actual_feedback @ (num_correct, num_incorrect_position) = check_pegs(&solution, &guess);
     println!(
         "check   : {} correct, {} incorrect position",
         num_correct, num_incorrect_position
     );
+
+    let candidates = apply_feedback(candidates, &guess, &actual_feedback);
+    println!("{} candidates", candidates.len());
 }
