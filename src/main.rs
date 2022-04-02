@@ -11,7 +11,7 @@ fn format_pegs(x: &CodePegs) -> String {
 }
 
 fn generate_puzzle() -> CodePegs {
-    [1, 2, 3, 4]
+    [6, 6, 5, 4]
 }
 
 fn generate_all_peg_combinations() -> Vec<CodePegs> {
@@ -76,18 +76,24 @@ fn main() {
     let solution = generate_puzzle();
     println!("solution: {}", format_pegs(&solution));
 
-    let candidates = generate_all_peg_combinations();
-    println!("{} candidates", candidates.len());
+    let mut candidates = generate_all_peg_combinations();
 
-    let guess = [1, 1, 4, 5];
-    println!("guess   : {}", format_pegs(&guess));
+    for _iter in 0..6 {
+        println!(" {} candidates", candidates.len());
 
-    let actual_feedback @ (num_correct, num_incorrect_position) = check_pegs(&solution, &guess);
-    println!(
-        "check   : {} correct, {} incorrect position",
-        num_correct, num_incorrect_position
-    );
+        let guess = candidates[0];
+        println!("  guess : {}", format_pegs(&guess));
 
-    let candidates = apply_feedback(candidates, &guess, &actual_feedback);
-    println!("{} candidates", candidates.len());
+        let actual_feedback = check_pegs(&solution, &guess);
+        println!(
+            "  check : {} correct, {} incorrect position",
+            actual_feedback.0, actual_feedback.1
+        );
+
+        candidates = apply_feedback(candidates, &guess, &actual_feedback);
+        if candidates.len() == 1 {
+            println!("SOLUTION: {}", format_pegs(&candidates[0]));
+            break;
+        }
+    }
 }
