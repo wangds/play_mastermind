@@ -1,8 +1,9 @@
 use std::cmp::min;
 
-type CodePegs = [i8; 4];
+type CodePegs = [i8; NUM_PEGS];
 type Feedback = (i8, i8);
 
+const NUM_PEGS: usize = 4;
 const MIN_PEG_VALUE: i8 = 1;
 const MAX_PEG_VALUE: i8 = 6;
 
@@ -29,6 +30,32 @@ fn generate_all_peg_combinations() -> Vec<CodePegs> {
     }
 
     combos
+}
+
+fn pick_guess(candidates: &Vec<CodePegs>) -> CodePegs {
+    let mut best_guess = candidates[0];
+    let mut best_score = candidates.len() as i32;
+
+    // Try each candidate as the guess.
+    for guess in candidates {
+        let mut feedback_counts = [0; (NUM_PEGS + 1) * (NUM_PEGS + 1)];
+
+        // For each guess, determine what feedback we could get back.
+        for candidate in candidates {
+            let (x, y) = check_pegs(candidate, guess);
+            feedback_counts[(NUM_PEGS + 1) * (x as usize) + (y as usize)] += 1;
+        }
+
+        // Minimise the worst case feedback.  A high feedback count is bad
+        // because it means this guess doesn't eliminate as many candidates.
+        let worst_case_score = *feedback_counts.iter().max().unwrap();
+        if worst_case_score < best_score {
+            best_guess = *guess;
+            best_score = worst_case_score;
+        }
+    }
+
+    best_guess
 }
 
 fn check_pegs(solution: &CodePegs, guess: &CodePegs) -> Feedback {
@@ -81,7 +108,7 @@ fn main() {
     for _iter in 0..6 {
         println!(" {} candidates", candidates.len());
 
-        let guess = candidates[0];
+        let guess = pick_guess(&candidates);
         println!("  guess : {}", format_pegs(&guess));
 
         let actual_feedback = check_pegs(&solution, &guess);
