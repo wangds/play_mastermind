@@ -16,6 +16,9 @@ struct Args {
     )]
     average: bool,
 
+    #[clap(short, long, help = "Assume distinct numbers in each position")]
+    distinct: bool,
+
     #[clap(
         help = "Interactive mode: program makes a guess and user enters feedback",
         short,
@@ -40,24 +43,31 @@ fn format_pegs(x: &CodePegs) -> String {
     format!("{} {} {} {}", x[0], x[1], x[2], x[3])
 }
 
-fn generate_puzzle() -> CodePegs {
-    [6, 6, 5, 4]
+fn generate_puzzle(distinct: bool) -> CodePegs {
+    *generate_all_peg_combinations(distinct).last().unwrap()
 }
 
-fn generate_all_peg_combinations() -> Vec<CodePegs> {
-    // 6^4 = 1,296 combinations.
+fn generate_all_peg_combinations(distinct: bool) -> Vec<CodePegs> {
     let mut combos = Vec::new();
+    let mut code = [0; NUM_PEGS];
 
-    for a in MIN_PEG_VALUE..(MAX_PEG_VALUE + 1) {
-        for b in MIN_PEG_VALUE..(MAX_PEG_VALUE + 1) {
-            for c in MIN_PEG_VALUE..(MAX_PEG_VALUE + 1) {
-                for d in MIN_PEG_VALUE..(MAX_PEG_VALUE + 1) {
-                    combos.push([a, b, c, d]);
-                }
+    // Standard mastermind game = 6^4 = 1,296 combinations.
+    fn gen(distinct: bool, combos: &mut Vec<CodePegs>, code: &mut CodePegs, idx: usize) {
+        for val in MIN_PEG_VALUE..(MAX_PEG_VALUE + 1) {
+            if distinct && code.iter().take(idx).any(|&v| v == val) {
+                continue;
+            }
+
+            code[idx] = val;
+            if idx == code.len() - 1 {
+                combos.push(*code);
+            } else {
+                gen(distinct, combos, code, idx + 1);
             }
         }
     }
 
+    gen(distinct, &mut combos, &mut code, 0);
     combos
 }
 
@@ -165,8 +175,8 @@ fn apply_feedback(
     combos
 }
 
-fn solve(mode: ExecutionMode) -> i32 {
-    let mut candidates = generate_all_peg_combinations();
+fn solve(mode: ExecutionMode, distinct: bool) -> i32 {
+    let mut candidates = generate_all_peg_combinations(distinct);
     for iter in 0..6 {
         println!(" {} candidates", candidates.len());
         if candidates.len() <= 0 {
@@ -201,16 +211,16 @@ fn main() {
     let args = Args::parse();
     if args.interactive {
         println!("INTERACTIVE MODE");
-        solve(ExecutionMode::Interactive);
+        solve(ExecutionMode::Interactive, args.distinct);
     } else if args.average {
         println!("AVERAGE MODE");
-        let solutions = generate_all_peg_combinations();
+        let solutions = generate_all_peg_combinations(args.distinct);
         let num_solutions = solutions.len();
         let mut sum_steps = 0;
         let mut max_steps = 0;
 
         for solution in solutions {
-            let steps = solve(ExecutionMode::KnownSolution(solution));
+            let steps = solve(ExecutionMode::KnownSolution(solution), args.distinct);
             assert!(steps > 0);
             sum_steps += steps;
             max_steps = max(max_steps, steps);
@@ -220,8 +230,8 @@ fn main() {
         println!("avg: {} / {} = {}", sum_steps, num_solutions, avg_steps);
         println!("max: {}", max_steps);
     } else {
-        let solution = generate_puzzle();
+        let solution = generate_puzzle(args.distinct);
         println!("KNOWN SOLUTION: {}", format_pegs(&solution));
-        solve(ExecutionMode::KnownSolution(solution));
+        solve(ExecutionMode::KnownSolution(solution), args.distinct);
     }
 }
