@@ -1,4 +1,26 @@
+use clap::Parser;
+use lazy_static::lazy_static;
+use regex::Regex;
 use std::cmp::min;
+use std::io;
+use std::io::Write;
+use std::str::FromStr;
+
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    #[clap(
+        help = "Interactive mode: program makes a guess and user enters feedback",
+        short,
+        long
+    )]
+    interactive: bool,
+}
+
+enum ExecutionMode {
+    Interactive,
+    KnownSolution(CodePegs),
+}
 
 type CodePegs = [i8; NUM_PEGS];
 type Feedback = (i8, i8);
@@ -82,6 +104,38 @@ fn check_pegs(solution: &CodePegs, guess: &CodePegs) -> Feedback {
     (num_correct, num_correct_values - num_correct)
 }
 
+fn read_feedback() -> Feedback {
+    lazy_static! {
+        static ref RE: Regex = Regex::new(
+            r"(?x)^
+            (?P<x>\d),\s*
+            (?P<y>\d)\s*\n"
+        )
+        .unwrap();
+    }
+
+    loop {
+        print!("feedback: ");
+        io::stdout().flush().unwrap();
+
+        let mut buffer = String::new();
+        match io::stdin().read_line(&mut buffer) {
+            Ok(_) => {
+                let re = RE.captures(&buffer).and_then(|cap| {
+                    let x = i8::from_str(cap.name("x").unwrap().as_str()).unwrap();
+                    let y = i8::from_str(cap.name("y").unwrap().as_str()).unwrap();
+                    Some((x, y))
+                });
+
+                if let Some(feedback) = re {
+                    return feedback;
+                }
+            }
+            Err(_) => (),
+        }
+    }
+}
+
 fn apply_feedback(
     candidates: Vec<CodePegs>,
     guess: &CodePegs,
@@ -99,19 +153,22 @@ fn apply_feedback(
     combos
 }
 
-fn main() {
-    let solution = generate_puzzle();
-    println!("solution: {}", format_pegs(&solution));
-
+fn solve(mode: ExecutionMode) {
     let mut candidates = generate_all_peg_combinations();
-
     for _iter in 0..6 {
         println!(" {} candidates", candidates.len());
+        if candidates.len() <= 0 {
+            return;
+        }
 
         let guess = pick_guess(&candidates);
         println!("  guess : {}", format_pegs(&guess));
 
-        let actual_feedback = check_pegs(&solution, &guess);
+        let actual_feedback = match mode {
+            ExecutionMode::Interactive => read_feedback(),
+            ExecutionMode::KnownSolution(ref solution) => check_pegs(solution, &guess),
+        };
+
         println!(
             "  check : {} correct, {} incorrect position",
             actual_feedback.0, actual_feedback.1
@@ -122,5 +179,17 @@ fn main() {
             println!("SOLUTION: {}", format_pegs(&candidates[0]));
             break;
         }
+    }
+}
+
+fn main() {
+    let args = Args::parse();
+    if args.interactive {
+        println!("INTERACTIVE MODE");
+        solve(ExecutionMode::Interactive);
+    } else {
+        let solution = generate_puzzle();
+        println!("KNOWN SOLUTION: {}", format_pegs(&solution));
+        solve(ExecutionMode::KnownSolution(solution));
     }
 }
